@@ -1,0 +1,11 @@
+*.pdf
+*.docx
+*.zip
+.local/
+evidence/
+build_lab3_report.py
+__pycache__/
+*.py[cod]
+.DS_Store
+data/
+*.sqlite3*
