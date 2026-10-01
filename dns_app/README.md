@@ -100,6 +100,18 @@ curl --retry 5 --retry-all-errors 'http://localhost:8080/fibonacci?hostname=fibo
 
 ## Deploy to a cloud Kubernetes cluster
 
+The public images support both `linux/amd64` and `linux/arm64`:
+
+- [leonchai/dcn-lab3-as:1.0](https://hub.docker.com/r/leonchai/dcn-lab3-as)
+- [leonchai/dcn-lab3-fs:1.0](https://hub.docker.com/r/leonchai/dcn-lab3-fs)
+- [leonchai/dcn-lab3-us:1.0](https://hub.docker.com/r/leonchai/dcn-lab3-us)
+
+To rebuild and publish with an account that has write access to those repositories, run this from `dns_app`:
+
+```sh
+docker buildx bake -f compose.yaml --set '*.platform=linux/amd64,linux/arm64' --push
+```
+
 The cluster needs a default StorageClass (K3s supplies `local-path`), permission to provision a 1 Gi PVC, and access to the published images. The manifest contains the namespace, all three Deployments and NodePort Services, the AS PVC, and a one-time registration Job.
 
 ```sh
@@ -127,6 +139,20 @@ curl -i "http://${NODE_IP}:30003/fibonacci?hostname=fibonacci.com&fs_port=9090&n
 ```
 
 The second request enters through US NodePort 30003; US communicates internally with AS port 53533 and FS port 9090. External clients can also send a query directly to AS NodePort 30001. The registration Job runs once for an initial deployment; if the FS Service is deleted and recreated with another ClusterIP, rerun the registration or recreate the Job.
+
+### Verified cloud run
+
+On September 30, 2026 (America/New_York), this manifest was deployed to an AWS EC2 Ubuntu 24.04 instance in `us-east-2` running K3s `v1.36.4+k3s1`. All three Deployments reached `1/1` ready, the 1 Gi AS PVC was bound, and the registration Job completed. The same 39 integration checks passed both on the node and from an external client through the public NodePorts. Restarting the AS Deployment preserved the registered record and the end-to-end result `55` without re-registration.
+
+The test client can target another cloud run with:
+
+```sh
+US_URL="http://${NODE_IP}:30003" FS_URL="http://${NODE_IP}:30002" \
+AS_HOST="$NODE_IP" AS_PORT=30001 REGISTER_IP="$FS_CLUSTER_IP" \
+REGISTER_AS=as REGISTER_AS_PORT=53533 FS_PORT=9090 python3 tests/verify.py
+```
+
+Set `FS_CLUSTER_IP` to `kubectl -n dcn-lab3 get svc fs -o jsonpath='{.spec.clusterIP}'`. Keep the instance's assigned public IP in your own run records; stopping and starting an instance may change it.
 
 ## Course references
 
